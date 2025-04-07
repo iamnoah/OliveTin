@@ -2,6 +2,7 @@ package acl
 
 import (
 	"context"
+	"strings"
 
 	config "github.com/OliveTin/OliveTin/internal/config"
 	log "github.com/sirupsen/logrus"
@@ -196,6 +197,7 @@ func UserFromSystem(cfg *config.Config, username string) *AuthenticatedUser {
 }
 
 func buildUserAcls(cfg *config.Config, user *AuthenticatedUser) {
+Lists:
 	for _, acl := range cfg.AccessControlLists {
 		if slices.Contains(acl.MatchUsernames, user.Username) {
 			user.Acls = append(user.Acls, acl.Name)
@@ -205,9 +207,23 @@ func buildUserAcls(cfg *config.Config, user *AuthenticatedUser) {
 		if slices.Contains(acl.MatchUsergroups, user.Usergroup) {
 			user.Acls = append(user.Acls, acl.Name)
 			continue
+		}
 
+		// handle multiple usergroups - groups will be separated by a space
+		if hasGroupsMatch(acl.MatchUsergroups, user.Usergroup) {
+			user.Acls = append(user.Acls, acl.Name)
+			continue Lists
 		}
 	}
+}
+
+func hasGroupsMatch(matchUsergroups []string, usergroup string) bool {
+	for group := range strings.FieldsSeq(usergroup) {
+		if slices.Contains(matchUsergroups, group) {
+			return true
+		}
+	}
+	return false
 }
 
 func isACLRelevantToAction(cfg *config.Config, actionAcls []string, acl *config.AccessControlList, user *AuthenticatedUser) bool {
